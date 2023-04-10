@@ -5,6 +5,6 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 
 ADD wait_for.sh /usr/local/bin/wait_for.sh
 
-USER 65535
+USER 65534
 
 ENTRYPOINT ["wait_for.sh"]
