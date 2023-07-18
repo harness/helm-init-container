@@ -51,53 +51,61 @@ exit 1
 get_pod_state() {
     get_pod_state_name="$1"
     get_pod_state_flags="$2"
+
+    exec 3>&1 4>&2
+    tmpfile=$(mktemp /tmp/temperr.XXXXXX)
     get_pod_state_output1=$(kubectl get pods "$get_pod_state_name" $get_pod_state_flags $KUBECTL_ARGS -o go-template='
-{{- define "checkStatus" -}}
-  {{- $rootStatus := .status }}
-  {{- $hasReadyStatus := false }}
-  {{- range .status.conditions -}}
-    {{- if eq .type "Ready" -}}
-      {{- $hasReadyStatus = true }}
-      {{- if eq .status "False" -}}
-        {{- if .reason -}}
-          {{- if ne .reason "PodCompleted" -}}
-            {{ .status }}
-            {{- range $rootStatus.containerStatuses -}}
-              {{- if .state.terminated.reason -}}
-              :{{ .state.terminated.reason }}
-              {{- end -}}
+    {{- define "checkStatus" -}}
+    {{- $rootStatus := .status }}
+    {{- $hasReadyStatus := false }}
+    {{- range .status.conditions -}}
+        {{- if eq .type "Ready" -}}
+        {{- $hasReadyStatus = true }}
+        {{- if eq .status "False" -}}
+            {{- if .reason -}}
+            {{- if ne .reason "PodCompleted" -}}
+                {{ .status }}
+                {{- range $rootStatus.containerStatuses -}}
+                {{- if .state.terminated.reason -}}
+                :{{ .state.terminated.reason }}
+                {{- end -}}
+                {{- end -}}
             {{- end -}}
-          {{- end -}}
-        {{- else -}}
-          {{ .status }}
+            {{- else -}}
+            {{ .status }}
+            {{- end -}}
         {{- end -}}
-      {{- end -}}
+        {{- end -}}
+    {{- else -}}
+        {{- printf "No resources found.\n" -}}
     {{- end -}}
-  {{- else -}}
-    {{- printf "No resources found.\n" -}}
-  {{- end -}}
-  {{- if ne $hasReadyStatus true -}}
-    {{- printf "False" -}}
-  {{- end -}}
-  {{- if eq $hasReadyStatus true -}}
-    {{- printf "Ready" -}}
-  {{- end -}}
-{{- end -}}
-
-{{- if .items -}}
-    {{- range .items -}}
-      {{ template "checkStatus" . }}
+    {{- if ne $hasReadyStatus true -}}
+        {{- printf "False" -}}
     {{- end -}}
-{{- else -}}
-    {{ template "checkStatus" . }}
-{{- end -}}' 2>&1)
+    {{- if eq $hasReadyStatus true -}}
+        {{- printf "Ready" -}}
+    {{- end -}}
+    {{- end -}}
 
-    if [ $? -ne 0 ]; then
-        if expr match "$get_pod_state_output1" '\(.*not found$\)' 1>/dev/null ; then
+    {{- if .items -}}
+        {{- range .items -}}
+        {{ template "checkStatus" . }}
+        {{- end -}}
+    {{- else -}}
+        {{ template "checkStatus" . }}
+    {{- end -}}' 2>"$tmpfile"; echo $? >&3)
+
+    get_pod_state_exit_code=$?
+    get_pod_state_output_error=$(<$tmpfile)
+    rm "$tmpfile"
+    exec 3>&- 4>&-
+
+    if [ $get_pod_state_exit_code -ne 0 ]; then
+        if expr match "$get_pod_state_output_error" '\(.*not found$\)' 1>/dev/null ; then
             echo "No pods found, waiting for them to be created..." >&2
-            echo "$get_pod_state_output1" >&2
+            echo "$get_pod_state_output_error" >&2
         else
-            echo "$get_pod_state_output1" >&2
+            echo "$get_pod_state_output_error" >&2
             kill -s TERM $TOP_PID
         fi
     elif [ $DEBUG -ge 2 ]; then
