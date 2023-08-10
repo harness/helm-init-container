@@ -51,6 +51,9 @@ exit 1
 get_pod_state() {
     get_pod_state_name="$1"
     get_pod_state_flags="$2"
+
+    exec 3>&1 4>&2
+    tmpfile=$(mktemp /tmp/temperr.XXXXXX)
     get_pod_state_output1=$(kubectl get pods "$get_pod_state_name" $get_pod_state_flags $KUBECTL_ARGS -o go-template='
 {{- define "checkStatus" -}}
   {{- $rootStatus := .status }}
@@ -90,31 +93,36 @@ get_pod_state() {
     {{- end -}}
 {{- else -}}
     {{ template "checkStatus" . }}
-{{- end -}}' 2>&1)
+{{- end -}}' 2>"$tmpfile"; echo $? >&3)
 
-    if [ $? -ne 0 ]; then
-        if expr match "$get_pod_state_output1" '\(.*not found$\)' 1>/dev/null ; then
-            echo "No pods found, waiting for them to be created..." >&2
-            echo "$get_pod_state_output1" >&2
-        else
-            echo "$get_pod_state_output1" >&2
-            kill -s TERM $TOP_PID
-        fi
-    elif [ $DEBUG -ge 2 ]; then
-        echo "$get_pod_state_output1" >&2
+get_pod_state_exit_code=$?
+get_pod_state_output_error=$(<$tmpfile)
+rm "$tmpfile"
+exec 3>&- 4>&-
+
+if [ $get_pod_state_exit_code -ne 0 ]; then
+    if expr match "$get_pod_state_output_error" '\(.*not found$\)' 1>/dev/null ; then
+        echo "No pods found, waiting for them to be created..." >&2
+        echo "$get_pod_state_output_error" >&2
+    else
+        echo "$get_pod_state_output_error" >&2
+        kill -s TERM $TOP_PID
     fi
+elif [ $DEBUG -ge 2 ]; then
+    echo "$get_pod_state_output1" >&2
+fi
 
-    if [ $TREAT_ERRORS_AS_READY -eq 0 ]; then
-        get_pod_state_output1=$(printf "%s" "$get_pod_state_output1" | sed 's/Ready//g' )
-    elif [ $TREAT_ERRORS_AS_READY -eq 1 ]; then
+if [ $TREAT_ERRORS_AS_READY -eq 0 ]; then
+    get_pod_state_output1=$(printf "%s" "$get_pod_state_output1" | sed 's/Ready//g' )
+elif [ $TREAT_ERRORS_AS_READY -eq 1 ]; then
+    get_pod_state_output1=$(printf "%s" "$get_pod_state_output1" | sed 's/Ready\|False:Error//g' )
+elif [ $TREAT_ERRORS_AS_READY -eq 2 ]; then
+    if expr match "$get_pod_state_output1" '\(.*Ready.*\)' 1>/dev/null ; then
         get_pod_state_output1=$(printf "%s" "$get_pod_state_output1" | sed 's/Ready\|False:Error//g' )
-    elif [ $TREAT_ERRORS_AS_READY -eq 2 ]; then
-        if expr match "$get_pod_state_output1" '\(.*Ready.*\)' 1>/dev/null ; then
-          get_pod_state_output1=$(printf "%s" "$get_pod_state_output1" | sed 's/Ready\|False:Error//g' )
-        else
-          get_pod_state_output1='No pods ready'
-        fi
+    else
+        get_pod_state_output1='No pods ready'
     fi
+fi
 
     if [ $DEBUG -ge 1 ]; then
         echo "$get_pod_state_output1" >&2
