@@ -1,0 +1,2 @@
+DOCKER_FILE_PATH: helm-init-container/Dockerfile
+HELM_CHART_SOURCE_DIRECTORY: <none>
