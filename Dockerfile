@@ -1,4 +1,4 @@
-FROM redhat/ubi8:latest
+FROM redhat/ubi8-minimal:8.10
 
 RUN yum update -y
 RUN yum install curl
