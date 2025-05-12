@@ -1,4 +1,4 @@
-FROM redhat/ubi8-minimal:8.10
+FROM redhat/ubi9-minimal:9.4
 
 RUN microdnf update --nodocs --setopt=install_weak_deps=0 \
   && microdnf install -y curl findutils \
