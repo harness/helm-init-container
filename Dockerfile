@@ -1,5 +1,8 @@
 FROM redhat/ubi9-minimal:9.4
 
+RUN echo -e '#!/bin/sh\nexec /usr/bin/microdnf -y "$@"' > /usr/local/bin/microdnf \
+  && chmod +x /usr/local/bin/microdnf
+
 RUN microdnf update --nodocs --setopt=install_weak_deps=0 \
   && microdnf install -y curl findutils \
   && microdnf clean all
