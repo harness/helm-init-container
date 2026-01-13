@@ -1,4 +1,4 @@
-FROM redhat/ubi9-minimal:9.4
+FROM redhat/ubi9-minimal:latest
 
 RUN echo -e '#!/bin/sh\nexec /usr/bin/microdnf -y "$@"' > /usr/local/bin/microdnf \
   && chmod +x /usr/local/bin/microdnf
