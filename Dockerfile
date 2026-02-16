@@ -1,4 +1,4 @@
-FROM redhat/ubi9-minimal:9.7
+FROM harness0.harness.io/oci/docker_artifacts/ubi9:9-rfcurated
 
 RUN echo -e '#!/bin/sh\nexec /usr/bin/microdnf -y "$@"' > /usr/local/bin/microdnf \
   && chmod +x /usr/local/bin/microdnf
