@@ -1,13 +1,9 @@
-FROM harness0.harness.io/oci/docker_artifacts/ubi9:9-rfcurated
+FROM harness0.harness.io/oci/docker_artifacts/hhi/harnessos-ubi:1
 
-USER root
+RUN apk add --no-cache jq kubectl-1.37-default
 
-RUN microdnf update --nodocs --setopt=install_weak_deps=0 \
-  && microdnf install -y findutils \
-  && microdnf clean all
-  
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
+COPY --chmod=755 wait_for.sh /usr/local/bin/wait_for.sh
 
-ADD wait_for.sh /usr/local/bin/wait_for.sh
+USER 65534
 
 ENTRYPOINT ["wait_for.sh"]
